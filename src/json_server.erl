@@ -17,21 +17,21 @@ start_link() ->
 init([Port]) ->
 	process_flag(trap_exit, true),
 	{ok, Listen} = gen_tcp:listen(Port, 
-		[{active, true},
+		[{active, false},
 		 binary,
 		 {reuseaddr, true}]), 
 	spawn(fun() ->
-	parallel(Listen) end),
+	accept_parallel(Listen) end),
 	io:format("~p started~n", [?MODULE]),
 	{ok, 0}.
 
-parallel(Listen) ->
+accept_parallel(Listen) ->
 	{ok, Socket} = gen_tcp:accept(Listen),
-	spawn(fun() -> parallel(Listen)	end),
+	spawn(fun() -> accept_parallel(Listen)	end),
 	loop(Socket).
 
-handle_call({check_data, Data}, _From, N) ->
-	{reply, check_data(Data), N + 1}.
+handle_call(Request, _From, N) ->
+	{reply, Request, N + 1}.
 
 handle_cast(_Msg, N) -> 
 	{noreply, N}.
@@ -46,25 +46,40 @@ terminate(_Reason, _N) ->
 code_change(_OldVsn, N, _Extra)	-> {ok, N}.
 
 loop(Socket) ->
+	% case gen_tcp:recv(Socket, 0) of
+	% 	{ok, Bin} ->
+	% 		case check_data(Bin) of
+	% 		ok ->
+	% 			gen_tcp:send(Socket, "ok");
+	% 		{error, _Data} ->
+	% 			gen_tcp:send(Socket, "error")		
+	% 	    end;
+	% 	{error, Reason} ->
+	% 		exit(Reason)
+	% end.
+	inet:setopts(Socket, [{active, once}]),		    
 	receive
 		{tcp, Socket, Bin} ->
-		case check_data(Bin) of
-			{ok, Data} ->
-				gen_tcp:send(Socket, Data)
-		end
+			io:format("Sent ok~n"),
+			Answer = check_data(Bin),
+			gen_tcp:send(Socket, atom_to_binary(Answer, utf8)),
+			loop(Socket);
+		{tcp_closed, Socket} ->
+			io:format("Socket ~w closed [~w]~n", [Socket, self()]),
+			ok	
 	end.	
 
 check_data(Bin) ->
-	Data = binary_to_list(Bin),
+	Data = mochijson:decode(Bin),
 	case Data of
-				{user, [{name, Name}, {password, Password}]} ->
-					io:format("We got a new user: ~n
-						Name - ~p~n
-						Password - ~p~n", [Name, Password]);
-				{Pid, Any} -> 
-					io:format("Undefinable data - ~p.~n", [Any]),
-					Pid ! ok;
+				{struct, [{"login", Name}, {"password", Password}]} = NewUser ->
+					io:format("We got a new user:~n  Name - ~p~n  Password - ~p~n", [Name, Password]),
+					spawn(fun() -> save_data(NewUser) end),
+					ok;
 				Any ->
 					io:format("We got ~p~n", [Any]),
-					{ok, Any}	
-			end.		
+					error	
+			end.
+
+save_data(User) ->
+	io:format("We're trying a new user - ~p", [User]).					

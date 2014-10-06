@@ -1,6 +1,6 @@
 {application, json_server,
  [
-  {description, ""},
+  {description, "ikwit login server"},
   {vsn, "1"},
   {modules, [json_server, json_server_sup, json_server_app]},
   {registered, [json_server]},
