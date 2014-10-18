@@ -46,17 +46,6 @@ terminate(_Reason, _N) ->
 code_change(_OldVsn, N, _Extra)	-> {ok, N}.
 
 loop(Socket) ->
-	% case gen_tcp:recv(Socket, 0) of
-	% 	{ok, Bin} ->
-	% 		case check_data(Bin) of
-	% 		ok ->
-	% 			gen_tcp:send(Socket, "ok");
-	% 		{error, _Data} ->
-	% 			gen_tcp:send(Socket, "error")		
-	% 	    end;
-	% 	{error, Reason} ->
-	% 		exit(Reason)
-	% end.
 	inet:setopts(Socket, [{active, once}]),		    
 	receive
 		{tcp, Socket, Bin} ->
