@@ -64,7 +64,7 @@ check_data(Bin) ->
 				{struct, [{"login", Name}, {"password", Password}]} ->
 					R = #user{login = Name, password = Password},
 					io:format("We got a new user:~n  Name - ~p~n  Password - ~p~n", [Name, Password]),
-				 	security:encode(Name, Password),
+				 	login_security:encode(Name, Password),
 					spawn(fun() -> save_data(R#user.login) end),
 					ok;
 				Any ->
