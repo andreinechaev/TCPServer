@@ -25,6 +25,7 @@ start_link() ->
 
 init([]) ->
     {ok, { {one_for_one, 5, 10}, [
-    ?CHILD(json_server, worker)
+    ?CHILD(json_server, worker),
+    ?CHILD(security, worker)
     ]} }.
 

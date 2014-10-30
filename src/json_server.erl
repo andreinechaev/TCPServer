@@ -7,7 +7,7 @@
 -export ([init/1, handle_call/3,
  		handle_cast/2, handle_info/2,
   		terminate/2, code_change/3]).
-
+-record (user, {login = "undef", password}).
 -define (PORT, 1477).
 
 start_link() ->
@@ -61,9 +61,11 @@ loop(Socket) ->
 check_data(Bin) ->
 	Data = mochijson:decode(Bin),
 	case Data of
-				{struct, [{"login", Name}, {"password", Password}]} = NewUser ->
+				{struct, [{"login", Name}, {"password", Password}]} ->
+					R = #user{login = Name, password = Password},
 					io:format("We got a new user:~n  Name - ~p~n  Password - ~p~n", [Name, Password]),
-					spawn(fun() -> save_data(NewUser) end),
+				 	security:encode(Name, Password),
+					spawn(fun() -> save_data(R#user.login) end),
 					ok;
 				Any ->
 					io:format("We got ~p~n", [Any]),
@@ -71,4 +73,4 @@ check_data(Bin) ->
 			end.
 
 save_data(User) ->
-	io:format("We're trying a new user - ~p", [User]).					
+	io:format("We're trying a new user - ~p~n", [User]).					
