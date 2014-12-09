@@ -2,8 +2,7 @@
 -behaviour (gen_server).
 -include ("db_info.hrl").
 
--export ([start_link/0, check_data/1, look_up/1]).
--export ([send/1]).
+-export ([start_link/0, check_data/1]).
 
 %%gen_server callbacks
 -export ([init/1, handle_call/3,
@@ -58,51 +57,25 @@ loop(Socket) ->
 			io:format("Socket ~w closed [~w]~n", [Socket, self()]),
 			ok	
 	end.	
-% TODO: create auth from regestration to login access
+
 check_data(Bin) ->
 	case mochijson:decode(Bin) of
 				{struct, [{"login", Login}, {"password", Password}]} 
 				when Login =/= [], Password =/= []  ->
 				 	Token = gen_server:call(security, {encode, Login, Password}),
-				 	io:format("Token after :call/2 ~p~n", [Token]),
 				 	TokinizedUser = #token{login = Login, token = Token},	
-					look_up(TokinizedUser);
-				{struct, [{"login", Login}, {"email", Email}, {"password", Password}]} ->
+					gen_server:call(db_server, {look_up, TokinizedUser});
+				{struct, [{"login", Login}, {"email", Email}, {"password", Password}]}
+				when Login =/= [], Email =/= [], Password =/= [] ->
 					TPassword = gen_server:call(security, {encode, Login, Password}),
 					NewUser = #users{login = Login, email = Email, password = TPassword},
-					spawn(fun() -> 
-						save_data(NewUser)
-						end),
+					gen_server:cast(db_server, {save, NewUser}),
 					"ok";
 				Any ->
 					io:format("Object ~p is trying to get the access~n", [Any]),
 					"error"	
 			end.
-
-
-% TODO: Login = {Email : EncryptedPassword}.
-save_data(User) ->
-	io:format("We're trying a new user - ~p~n", [User]),
-	Fun = fun()	-> mnesia:write(User) end,
-	mnesia:transaction(Fun),
-	io:format("saved~n").
-
-%look into the users table and comparing LG user with the table
-
-look_up(TokinizedUser) ->
-	Fun = fun() ->
-			mnesia:read({users, TokinizedUser#token.login})
-		end,
-		case mnesia:transaction(Fun) of
-			{atomic,[{users, _UserName, _Email, Token}]}
-				when Token =:= TokinizedUser#token.token ->
-				Token;
-			_Any ->
-				"error"	
-		end.
-
-send(Msg) ->
-	gen_server:call(security, Msg).		
+	
 
 % list_length([]) -> 0;
 % list_length([_|T]) -> 1 + list_length(T).

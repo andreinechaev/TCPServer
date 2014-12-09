@@ -15,19 +15,20 @@ start_link() ->
 	gen_server:start_link({local, ?SERVER}, ?SERVER, [], []).
 
 init([]) ->
-	process_flag(trap_exit, true),
 	gen_server:cast(?SERVER, init_db),
 	io:format("~p started~n", [?SERVER]),
 	{ok, 0}.
 
-handle_call(Request, _From, N) ->
-	{reply, Request, N+1}.
+handle_call({look_up, User}, _From, N) ->
+	Info = look_up(User),
+	{reply, Info, N+1}.
 
 handle_cast(init_db, N) ->
 	init_db(),
 	{noreply, N};
 
-handle_cast(_Request, N) ->
+handle_cast({save, User}, N) -> 
+	save_user(User),
 	{noreply, N}.
 
 handle_info(_Info, N) ->
@@ -56,6 +57,23 @@ init_db() ->
 	mnesia:create_table(users, [{attributes, record_info(fields, users)}]),
 	mnesia:create_table(token, [{attributes, record_info(fields, token)}]),
 	io:format("Tables are created").
+
+save_user(User) ->
+	io:format("Tring to save User - ~p~n", [User]),
+	Fun = fun() -> mnesia:write(User) end,
+	mnesia:transaction(Fun).
+
+look_up(User) ->
+	Fun = fun() ->
+		mnesia:read({users, User#token.login})
+	end,
+	case mnesia:transaction(Fun) of
+			{atomic,[{users, _UserName, _Email, Token}]}
+				when Token =:= User#token.token ->
+				Token;
+			_Any ->
+				"error"
+	end.
 
 read_object_from_table(TableName, Key) ->
 	F = fun() ->

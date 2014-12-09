@@ -13,7 +13,6 @@ start_link() ->
 
 
 init([]) ->
-	process_flag(trap_exit, true),
 	crypto:start(),
  	io:format("~p started~n", [?MODULE]),
 	{ok, 0}.
