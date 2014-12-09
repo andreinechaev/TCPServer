@@ -1,7 +1,7 @@
--module (login_security).
+-module (security).
 -behaviour (gen_server).
 
--export ([start_link/0, encode/2]).
+-export ([start_link/0, encode/2, send/1]).
 
 %%gen_server callbacks
 -export ([init/1, handle_call/3,
@@ -18,8 +18,9 @@ init([]) ->
  	io:format("~p started~n", [?MODULE]),
 	{ok, 0}.
 
-handle_call(Request, _From, N) ->
-	{reply, Request, N + 1}.
+handle_call({encode, Login, Password}, _From, N) ->
+	Token = encode(Login, Password),
+	{reply, Token, N + 1}.
 
 handle_cast(_Msg, N) -> 
 	{noreply, N}.
@@ -38,5 +39,7 @@ encode(Key, Value) ->
 	BValue = list_to_binary(Value),
 	<<Mac:160/integer>> = crypto:hmac(sha, BKey, BValue),
 	Token = lists:flatten(io_lib:format("~40.16.0b", [Mac])),
-	io:format("Token - ~p~n", [Token]).
-					
+	Token.
+
+send(Msg) ->
+	gen_server:call(json_server, Msg).

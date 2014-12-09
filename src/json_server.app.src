@@ -2,8 +2,8 @@
  [
   {description, "ikwit login server"},
   {vsn, "1.1"},
-  {modules, [security, json_server, json_server_sup, json_server_app]},
-  {registered, [json_server, security]},
+  {modules, [json_server, security, db_server, json_server_sup, json_server_app]},
+  {registered, [json_server, security, db_server]},
   {applications, [
                   kernel,
                   stdlib

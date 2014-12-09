@@ -1,0 +1,2 @@
+-record (users, {login, email, password}).
+-record (token, {login, token}).

@@ -1,13 +1,14 @@
 -module (json_server).
 -behaviour (gen_server).
+-include ("db_info.hrl").
 
--export ([start_link/0, check_data/1]).
+-export ([start_link/0, check_data/1, look_up/1]).
+-export ([send/1]).
 
 %%gen_server callbacks
 -export ([init/1, handle_call/3,
  		handle_cast/2, handle_info/2,
   		terminate/2, code_change/3]).
--record (user, {login = "undef", password}).
 -define (PORT, 1477).
 
 start_link() ->
@@ -31,6 +32,7 @@ accept_parallel(Listen) ->
 	loop(Socket).
 
 handle_call(Request, _From, N) ->
+	io:format("In handle_call we got ~p~n", [Request]),
 	{reply, Request, N + 1}.
 
 handle_cast(_Msg, N) -> 
@@ -49,28 +51,59 @@ loop(Socket) ->
 	inet:setopts(Socket, [{active, once}]),		    
 	receive
 		{tcp, Socket, Bin} ->
-			io:format("Sent ok~n"),
 			Answer = check_data(Bin),
-			gen_tcp:send(Socket, atom_to_binary(Answer, utf8)),
+			gen_tcp:send(Socket, Answer),
 			loop(Socket);
 		{tcp_closed, Socket} ->
 			io:format("Socket ~w closed [~w]~n", [Socket, self()]),
 			ok	
 	end.	
-
+% TODO: create auth from regestration to login access
 check_data(Bin) ->
-	Data = mochijson:decode(Bin),
-	case Data of
-				{struct, [{"login", Name}, {"password", Password}]} ->
-					R = #user{login = Name, password = Password},
-					io:format("We got a new user:~n  Name - ~p~n  Password - ~p~n", [Name, Password]),
-				 	login_security:encode(Name, Password),
-					spawn(fun() -> save_data(R#user.login) end),
-					ok;
+	case mochijson:decode(Bin) of
+				{struct, [{"login", Login}, {"password", Password}]} 
+				when Login =/= [], Password =/= []  ->
+				 	Token = gen_server:call(security, {encode, Login, Password}),
+				 	io:format("Token after :call/2 ~p~n", [Token]),
+				 	TokinizedUser = #token{login = Login, token = Token},	
+					look_up(TokinizedUser);
+				{struct, [{"login", Login}, {"email", Email}, {"password", Password}]} ->
+					TPassword = gen_server:call(security, {encode, Login, Password}),
+					NewUser = #users{login = Login, email = Email, password = TPassword},
+					spawn(fun() -> 
+						save_data(NewUser)
+						end),
+					"ok";
 				Any ->
-					io:format("We got ~p~n", [Any]),
-					error	
+					io:format("Object ~p is trying to get the access~n", [Any]),
+					"error"	
 			end.
 
+
+% TODO: Login = {Email : EncryptedPassword}.
 save_data(User) ->
-	io:format("We're trying a new user - ~p~n", [User]).					
+	io:format("We're trying a new user - ~p~n", [User]),
+	Fun = fun()	-> mnesia:write(User) end,
+	mnesia:transaction(Fun),
+	io:format("saved~n").
+
+%look into the users table and comparing LG user with the table
+
+look_up(TokinizedUser) ->
+	Fun = fun() ->
+			mnesia:read({users, TokinizedUser#token.login})
+		end,
+		case mnesia:transaction(Fun) of
+			{atomic,[{users, _UserName, _Email, Token}]}
+				when Token =:= TokinizedUser#token.token ->
+				Token;
+			_Any ->
+				"error"	
+		end.
+
+send(Msg) ->
+	gen_server:call(security, Msg).		
+
+% list_length([]) -> 0;
+% list_length([_|T]) -> 1 + list_length(T).
+				
