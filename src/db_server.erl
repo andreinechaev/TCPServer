@@ -48,15 +48,15 @@ show_table(Table_name)->
         true -> mnesia:foldl(Iterator,[],Table_name);
         false -> 
             Exec = fun({Fun,Tab}) -> mnesia:foldl(Fun, [],Tab) end,
-            mnesia:activity(transaction,Exec,[{Iterator,Table_name}],mnesia_frag)
+            mnesia:activity(transaction, Exec, [{Iterator,Table_name}], mnesia_frag)
     end.
 
 init_db() ->
-	mnesia:start(),
 	mnesia:create_schema([node()]),
-	mnesia:create_table(users, [{attributes, record_info(fields, users)}]),
+	mnesia:start(),
+	mnesia:create_table(users, [{attributes, record_info(fields, users)}, {disc_copies, [node()]}]),
 	mnesia:create_table(token, [{attributes, record_info(fields, token)}]),
-	io:format("Tables are created").
+	io:format("Tables have been created").
 
 save_user(User) ->
 	io:format("Tring to save User - ~p~n", [User]),

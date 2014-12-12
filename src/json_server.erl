@@ -64,7 +64,9 @@ check_data(Bin) ->
 				when Login =/= [], Password =/= []  ->
 				 	Token = gen_server:call(security, {encode, Login, Password}),
 				 	TokinizedUser = #token{login = Login, token = Token},	
-					gen_server:call(db_server, {look_up, TokinizedUser});
+					User = gen_server:call(db_server, {look_up, TokinizedUser}),
+					io:format("User - ~p~n", [User]),
+					User;
 				{struct, [{"login", Login}, {"email", Email}, {"password", Password}]}
 				when Login =/= [], Email =/= [], Password =/= [] ->
 					TPassword = gen_server:call(security, {encode, Login, Password}),
