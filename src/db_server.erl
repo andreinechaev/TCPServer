@@ -2,7 +2,7 @@
 -behaviour (gen_server).
 -include ("db_info.hrl").
 
--export([start_link/0, show_table/1, read_object_from_table/2, read_token_from_table/2]). %TODO API functions 
+-export([start_link/0, show_table/1, read_object_from_table/2, read_token_from_table/1]). %TODO API functions 
 
 %gen_server callbacks functions
 -export([init/1, handle_call/3,
@@ -28,7 +28,7 @@ handle_cast(init_db, N) ->
 	{noreply, N};
 
 handle_cast({save, User}, N) -> 
-	save_user(User),
+	save_object(User),
 	{noreply, N}.
 
 handle_info(_Info, N) ->
@@ -58,9 +58,9 @@ init_db() ->
 	mnesia:create_table(token, [{attributes, record_info(fields, token)}]),
 	io:format("Tables have been created").
 
-save_user(User) ->
-	io:format("Tring to save User - ~p~n", [User]),
-	Fun = fun() -> mnesia:write(User) end,
+save_object(Object) ->
+	io:format("Tring to save Object - ~p~n", [Object]),
+	Fun = fun() -> mnesia:write(Object) end,
 	mnesia:transaction(Fun).
 
 look_up(User) ->
@@ -68,22 +68,28 @@ look_up(User) ->
 		mnesia:read({users, User#token.login})
 	end,
 	case mnesia:transaction(Fun) of
-			{atomic,[{users, _UserName, _Email, Token}]}
+			{atomic,[{users, Login, _Email, Token}]}
 				when Token =:= User#token.token ->
-				Token;
+				TmpToken = gen_server:call(security, {encode, get_timestamp(), Token}),
+				save_object(#token{login = Login, token = TmpToken}),
+				TmpToken;
 			_Any ->
 				"error"
 	end.
 
-read_object_from_table(TableName, Key) ->
+read_object_from_table(TableName, Object) ->
 	F = fun() ->
-		mnesia:read({TableName, Key})
+		mnesia:read({TableName, Object})
 	end,
 	mnesia:transaction(F).
 
-read_token_from_table(TableName, Key) ->
+read_token_from_table(Object) ->
 	F = fun() ->
-		mnesia:read({TableName, Key})
+		mnesia:read({token, Object})
 	end,
-	{atomic,[{_TableName, _UserName, Token}]} = mnesia:transaction(F),
-    Token.   	
+	{atomic,[{token, _UserName, Token}]} = mnesia:transaction(F),
+    Token. 
+
+get_timestamp() ->
+	{Mega, Sec, Micro} = os:timestamp(),
+	(Mega*1000000 + Sec)*1000 + round(Micro/1000).  	
