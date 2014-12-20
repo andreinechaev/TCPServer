@@ -56,7 +56,7 @@ init_db() ->
 	mnesia:start(),
 	mnesia:create_table(users, [{attributes, record_info(fields, users)}, {disc_copies, [node()]}]),
 	mnesia:create_table(token, [{attributes, record_info(fields, token)}]),
-	io:format("Tables have been created").
+	io:format("Tables have been created~n").
 
 save_object(Object) ->
 	io:format("Tring to save Object - ~p~n", [Object]),
@@ -64,13 +64,16 @@ save_object(Object) ->
 	mnesia:transaction(Fun).
 
 look_up(User) ->
+	% io:format("look_up ~p~n", User),
 	Fun = fun() ->
 		mnesia:read({users, User#token.login})
 	end,
 	case mnesia:transaction(Fun) of
 			{atomic,[{users, Login, _Email, Token}]}
 				when Token =:= User#token.token ->
-				TmpToken = gen_server:call(security, {encode, get_timestamp(), Token}),
+				io:format("Token before timestamp ~p~n", [Token]),
+				TS = lists:flatten(io_lib:format("~p", [get_timestamp()])),
+				TmpToken = gen_server:call(security, {encode, TS, Token}),
 				save_object(#token{login = Login, token = TmpToken}),
 				TmpToken;
 			_Any ->
