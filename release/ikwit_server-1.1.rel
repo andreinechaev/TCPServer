@@ -1,0 +1,7 @@
+{release,
+	{"ikwit_server", "1.1"},
+	{mnesia, "4.12.3"},
+	{crypto, "3.4.1"},
+		[ {kernel, "3.0.3"},
+		  {stdlib, "2.2"},
+		  {json_server, "1.1", permanent}]}.

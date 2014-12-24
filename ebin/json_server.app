@@ -1,5 +1,5 @@
 {application,json_server,
-             [{description,"ikwit login server"},
+             [{description,"ikwit server"},
               {vsn,"1.1"},
               {modules,[db_server,ikwit_server,json_server,json_server_app,
                         json_server_sup,login_security,security,server]},
