@@ -27,8 +27,8 @@ handle_cast(init_db, N) ->
 	init_db(),
 	{noreply, N};
 
-handle_cast({save, User}, N) -> 
-	save_object(User),
+handle_cast({save, Object}, N) -> 
+	save_object(Object),
 	{noreply, N}.
 
 handle_info(_Info, N) ->
@@ -55,6 +55,7 @@ init_db() ->
 	mnesia:create_schema([node()]),
 	mnesia:start(),
 	mnesia:create_table(users, [{attributes, record_info(fields, users)}, {disc_copies, [node()]}]),
+	mnesia:create_table(quests, [{attributes, record_info(fields, quests)}, {disc_copies, [node()]}]),
 	mnesia:create_table(token, [{attributes, record_info(fields, token)}]),
 	io:format("Tables have been created~n").
 

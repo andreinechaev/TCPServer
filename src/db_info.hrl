@@ -1,2 +1,3 @@
 -record (users, {login, email, password}).
 -record (token, {login, token}).
+-record (quests, {user, question, data}).

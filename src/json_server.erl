@@ -18,8 +18,9 @@ init([Port]) ->
 	process_flag(trap_exit, true),
 	{ok, Listen} = gen_tcp:listen(Port, 
 		[{active, false},
-		 binary,
-		 {reuseaddr, true}]), 
+		{recbuf, 512},
+		binary,
+		{reuseaddr, true}]), 
 	spawn(fun() ->
 	accept_parallel(Listen) end),
 	io:format("~p started~n", [?MODULE]),
@@ -28,7 +29,7 @@ init([Port]) ->
 accept_parallel(Listen) ->
 	{ok, Socket} = gen_tcp:accept(Listen),
 	spawn(fun() -> accept_parallel(Listen)	end),
-	loop(Socket).
+	loop(Socket, <<>>).
 
 handle_call(Request, _From, N) ->
 	io:format("In handle_call we got ~p~n", [Request]),
@@ -46,18 +47,37 @@ terminate(_Reason, _N) ->
 
 code_change(_OldVsn, N, _Extra)	-> {ok, N}.
 
-loop(Socket) ->
-	inet:setopts(Socket, [{active, once}]),		    
+
+%%========== Dirty and Stinky ================%%
+loop(Socket, JSON) ->
+	inet:setopts(Socket, [{active, once}]),
+	case jsx:is_json(JSON) of
+		true ->
+			An = check_data(JSON),
+			gen_tcp:send(Socket, An),
+			loop(Socket, <<>>);
+		false -> error	
+	end,	
 	receive
 		{tcp, Socket, Bin} ->
-			Answer = check_data(Bin),
-			gen_tcp:send(Socket, Answer),
-			loop(Socket);
+			case jsx:is_json(Bin) of
+				true ->
+					Tmp = erlang:iolist_to_binary([JSON, Bin]),
+					io:format("true-~p-~n", [Tmp]),
+					Answer = check_data(Tmp),
+					gen_tcp:send(Socket, Answer),
+					loop(Socket, <<>>);
+				false ->
+					Tmp = erlang:iolist_to_binary([JSON, Bin]),
+					% io:format("false-~p-~n", [Tmp]),
+					loop(Socket, Tmp)
+			end;
 		{tcp_closed, Socket} ->
 			io:format("Socket ~w closed [~w]~n", [Socket, self()]),
-			ok	
-	end.	
-
+			ok			
+	end.
+%%========== Dirty and Stinky ================%%	
+%% TODO take a look on db_server - base64 string
 check_data(Bin) ->
 	case mochijson:decode(Bin) of
 				{struct, [{"login", Login}, {"password", Password}]} 
@@ -73,10 +93,21 @@ check_data(Bin) ->
 					NewUser = #users{login = Login, email = Email, password = TPassword},
 					gen_server:cast(db_server, {save, NewUser}),
 					"ok";
+				{struct, [{"image", Image}, {"question", Question}, {"user", User}]}
+				when Question =/= [] ->
+					QuestRecord = #quests{user = User, question = Question, data = Image},
+					gen_server:cast(db_server, {save, QuestRecord}),
+					"ok";
 				Any ->
 					io:format("Object ~p is trying to get the access~n", [Any]),
-					"error"	
+					"error"
+					% "75de1aa70da3b1b24664a1b4098679c99fa1139c"	
 			end.
+	% {ok, Tokens, _EndLine} = erl_scan:string(Bin),
+	% {ok, AbsForm} = erl_parse:parse_exprs(Tokens),	
+	% io:format("~p~n", [Bin]),
+	% "75de1aa70da3b1b24664a1b4098679c99fa1139c".
+
 	
 
 % list_length([]) -> 0;
